@@ -7,6 +7,7 @@ app.use(bodyParser.urlencoded({extended: true}))
 app.get("/", function(req, res) {
     console.log("New home request by:", req.hostname);
     res.send("Ok :)")
+    console.log(req.body);
 })
 
 app.listen(port, ()=> {
