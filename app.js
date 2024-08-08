@@ -10,6 +10,6 @@ app.get("/", function(req, res) {
     console.log(req.body);
 })
 
-app.listen(port, ()=> {
-    console.log("Server started at port:", port);
-})
+var listener = app.listen(port, function(){
+    console.log('Listening on port ' + listener.address().port); //Listening on port 8888
+});
