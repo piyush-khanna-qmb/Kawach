@@ -1,4 +1,4 @@
-const express= require('express')
+const express= require("express")
 const bodyParser= require('body-parser')
 const app= express()
 const port =  process.env.PORT|| 3000;
@@ -11,5 +11,5 @@ app.get("/", function(req, res) {
 })
 
 var listener = app.listen(port, function(){
-    console.log('Listening on port ' + JSON.stringify(listener.address())); //Listening on port 8888
+    console.log('Listening on port ' + JSON.stringify(listener.address()));
 });
