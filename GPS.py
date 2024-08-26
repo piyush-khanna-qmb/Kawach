@@ -1,10 +1,13 @@
 import socket
 from threading import Thread
+import time
 
-HOST = '0.0.0.0'  # Listen on all network interfaces
-PORT = 5023
+HOST = '10.5.48.29'  # Listen on all network interfaces
+PORT = 8085
 BUFSIZ = 10240
 ADDR = (HOST, PORT)
+
+print(socket.gethostname())
 
 def accept_incoming_connections():
     while True:
@@ -13,12 +16,13 @@ def accept_incoming_connections():
         Thread(target=handle_client, args=(client_socket,)).start()
 
 def handle_client(client_socket):
-    try:
+    try: 
         while True:
             data = client_socket.recv(BUFSIZ)
             if not data:
                 break
             print("Received data:", data.decode('utf-8'))
+            print(time.time(), "Raw data:", data)
     except Exception as e:
         print(f"Error: {e}")
     finally:
