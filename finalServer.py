@@ -713,3 +713,29 @@ protocol_dict = {
         'position_upload_interval': 'upload_interval_response'
     }
 }
+
+GMAPS_API_KEY = "AIzaSyAw-J-GIXFAeH8klm6oA_b6hCXSf7GkSV4"
+gmaps = googlemaps.Client(key=GMAPS_API_KEY)
+
+# Details about host server
+# HOST = '10.5.48.29'
+HOST = ''
+PORT = 8085
+BUFSIZ = 4096
+ADDR = (HOST, PORT)
+
+# Initialize socket
+SERVER = socket(AF_INET, SOCK_STREAM)
+SERVER.bind(ADDR)
+
+# Store client data into dictionaries
+addresses = {}
+positions = {}
+
+if __name__ == '__main__':
+    SERVER.listen(5)
+    print("Waiting for connection...")
+    ACCEPT_THREAD = Thread(target=accept_incoming_connections)
+    ACCEPT_THREAD.start()
+    ACCEPT_THREAD.join()
+    SERVER.close()

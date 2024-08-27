@@ -104,6 +104,7 @@ def handle_client(client):
             else:
                 print('[', addresses[client]['address'][0], ']', 'DISCONNECTED: socket was closed for an unknown reason.')
                 client.close()
+                print("CURRDATAPACKET: ", currDataPacket)
                 break                
 
         # Something went sideways... close the socket so that it does not hang
@@ -111,6 +112,7 @@ def handle_client(client):
             print('[', addresses[client]['address'][0], ']', 'ERROR: socket was closed due to the following exception:')
             print(e)
             client.close()
+            print("CURRDATAPACKET: ", currDataPacket)
             break
     print("This thread is now closed.")
 
@@ -206,7 +208,8 @@ def answer_login(client, query):
 
     # DEBUG: Print IMEI and software version
     print("Detected IMEI :", addresses[client]['imei'], "and Sw v. :", addresses[client]['software_version'])
-
+    global currDataPacket
+    currDataPacket.imei= addresses[client]['imei']
     # Prepare response: in absence of control values, 
     # always accept the client
     response = '01'
@@ -314,11 +317,16 @@ def answer_gps(client, query):
     positions[client]['gps']['speed'] = gps_speed
     positions[client]['gps']['heading'] = gps_heading
     print('[', addresses[client]['address'][0], ']', "POSITION/GPS : Valid =", position_is_valid, "; Nb Sat =", gps_nb_sat, "; Lat =", gps_latitude, "; Long =", gps_longitude, "; Speed =", gps_speed, "; Heading =", gps_heading)
+
     kk= open("E:/Kawach/userSearch Webpage/loc.txt", 'w')
     lat=  gps_latitude
     lon=  gps_longitude
     kk.write(f"{lat}, {lon}")
     kk.close()
+    global currDataPacket
+    currDataPacket.lat= lat
+    currDataPacket.long= lon
+    currDataPacket.speed= gps_speed
     
     LOGGER('location', 'location_log.txt', addresses[client]['address'][0], addresses[client]['imei'], '', positions[client]['gps'])
 
