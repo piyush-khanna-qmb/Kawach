@@ -1,5 +1,20 @@
-import mongoengine as me
-from mongoengine import Document, fields, StringField, LongField, EmbeddedDocument, EmbeddedDocumentField, ListField
+#!/bin/python
+
+"""
+TCP Server for multithreaded (asynchronous) application.
+
+This server implements the protocol documented by the chinese
+company TOPIN to handle communication with their GPS trackers,
+sending and receiving TCP packets over 2G network.
+
+This program will create a TCP socket and each client will have
+its dedicated thread created, so that multipe clients can connect 
+simultaneously should this be necessary someday.
+
+This server is based on the work from:
+https://medium.com/swlh/lets-write-a-chat-app-in-python-f6783a9ac170
+"""
+
 from dotenv import load_dotenv
 from socket import AF_INET, socket, SOCK_STREAM
 from threading import Thread
@@ -10,30 +25,11 @@ import math
 import os
 import time
 
-connection_string = "mongodb+srv://piyush:oO1T5RXFaQV4kwFL@kawachtest.kglue.mongodb.net/?retryWrites=true&w=majority&appName=KawachTest"
-
-me.connect(
-    db='deviceDB',
-    host=connection_string
-)
-
-class Data(EmbeddedDocument):
-    latitude= fields.FloatField()
-    longitude= fields.FloatField()
-    altitude= fields.FloatField()
-    timestamp= StringField()
-    battery= fields.FloatField()
-    speed= fields.FloatField()
-
-
-class User(Document):
-    imei= LongField()
-    kawachId= StringField()
-    accountDob= StringField()
-    last50kData= ListField(EmbeddedDocumentField(Data))
-
-    def __str__(self):
-        return f"{{\nimei={self.imei!r}, \nkawach={self.kawachId!r}}}"
+def writeToDB(data, client):
+    print("\nDATA PUBLISHED ==>", data[client])
+    kk= open("D:/ManoJava/Kawach/loc.txt", 'a')
+    kk.write("\n", data[client])
+    kk.close()
 
 
 def accept_incoming_connections():
@@ -49,6 +45,7 @@ def accept_incoming_connections():
         # Initialize the dictionaries
         addresses[client] = {}
         positions[client] = {}
+        data[client] = {}
         
         # Add current client address into adresses
         addresses[client]['address'] = client_address
@@ -73,6 +70,7 @@ def LOGGER(event, filename, ip, client, type, data):
         elif (event == 'location'):
             # TSV format of: Timestamp, Client IP, Location DateTime, GPS/LBS, Validity, Nb Sat, Latitude, Longitude, Accuracy, Speed, Heading
             logMessage = datetime.now().strftime('%Y/%m/%d %H:%M:%S') + '\t' + ip + '\t' + client + '\t' + '\t'.join(list(str(x) for x in data.values())) + '\n'
+            print(data.values())
         log.write(logMessage)
 
 
@@ -91,6 +89,7 @@ def handle_client(client):
     # Keep receiving and analyzing packets until end of time
     # or until device sends disconnection signal
     keepAlive = True
+    # currDataPacket= {}
     while (True):
 
         # Handle socket errors with a try/except approach
@@ -99,9 +98,11 @@ def handle_client(client):
             
             # Only process non-empty packets
             if (len(packet) > 0):
-                print('[', addresses[client]['address'][0], ']', 'IN Hex :', packet.hex(), '(length in bytes =', len(packet), ')')
+                # print('[', addresses[client]['address'][0], ']', 'IN Hex :', packet.hex(), '(length in bytes =', len(packet), ')')
+                print("Data incoming from IP:", addresses[client]['address'][0])
+
                 keepAlive = read_incoming_packet(client, packet)
-                LOGGER('info', 'server_log.txt', addresses[client]['address'][0], addresses[client]['imei'], 'IN', packet.hex())
+                # LOGGER('info', 'server_log.txt', addresses[client]['address'][0], addresses[client]['imei'], 'IN', packet.hex())
                 
                 # Disconnect if client sent disconnect signal
                 #if (keepAlive is False):
@@ -111,7 +112,10 @@ def handle_client(client):
 
             # Close socket if recv() returns 0 bytes, i.e. connection has been closed
             else:
-                print('[', addresses[client]['address'][0], ']', 'DISCONNECTED: socket was closed for an unknown reason.')
+                # print('[', addresses[client]['address'][0], ']', 'DISCONNECTED: socket was closed for an unknown reason.')
+                # print("==>ADDRESSES:", addresses)
+                # print("==>POSITIONS:", positions)
+                print("Connection closed from IP:", addresses[client]['address'][0])
                 client.close()
                 break                
 
@@ -130,7 +134,7 @@ def read_incoming_packet(client, packet):
     and then redirects to response functions that will generate the apropriate 
     packet that should be sent back.
     Actual sending of the response packet will be done by an external function.
-    """
+    """ 
 
     # Convert hex string into list for convenience
     # Strip packet of bits 1 and 2 (start 0x78 0x78) and n-1 and n (end 0x0d 0x0a)
@@ -139,7 +143,7 @@ def read_incoming_packet(client, packet):
     # DEBUG: Print the role of current packet
     protocol_name = protocol_dict['protocol'][packet_list[1]]
     protocol_method = protocol_dict['response_method'][protocol_name]
-    print('The current packet is for protocol:', protocol_name, 'which has method:', protocol_method)
+    # print('The current packet is for protocol:', protocol_name, 'which has method:', protocol_method)
     
     # Prepare the response, initialize as empty
     r = ''
@@ -147,17 +151,33 @@ def read_incoming_packet(client, packet):
     # Get the protocol name and react accordingly
     if (protocol_name == 'login'):
         r = answer_login(client, packet_list)
+        
     
     elif (protocol_name == 'gps_positioning' or protocol_name == 'gps_offline_positioning'):
         r = answer_gps(client, packet_list)
 
     elif (protocol_name == 'status'):
         # Status can sometimes carry signal strength and sometimes not
+        # print("\nAddress Client data for imei: ", addresses[client]['imei'])
         if (packet_list[0] == '06'): 
-            print('[', addresses[client]['address'][0], ']', 'STATUS : Battery =', int(packet_list[2], base=16), '; Sw v. =', int(packet_list[3], base=16), '; Status upload interval =', int(packet_list[4], base=16))
+            # print('[', addresses[client]['address'][0], ']', 'STATUS : Battery =', int(packet_list[2], base=16), '; Sw v. =', int(packet_list[3], base=16), '; Status upload interval =', int(packet_list[4], base=16))
+            
+            data[client]['battery']= int(packet_list[2], base=16)
+            data[client]['signal']= 20
+            # currDataPacket.battery= int(packet_list[2], base=16)
+            # currDataPacket.signal= 20
+
         elif (packet_list[0] == '07'): 
-            print('[', addresses[client]['address'][0], ']', 'STATUS : Battery =', int(packet_list[2], base=16), '; Sw v. =', int(packet_list[3], base=16), '; Status upload interval =', int(packet_list[4], base=16), '; Signal strength =', int(packet_list[5], base=16))
+            # print('[', addresses[client]['address'][0], ']', 'STATUS : Battery =', int(packet_list[2], base=16), '; Sw v. =', int(packet_list[3], base=16), '; Status upload interval =', int(packet_list[4], base=16), '; Signal strength =', int(packet_list[5], base=16))
+            data[client]['battery']= int(packet_list[2], base=16)
+            data[client]['signal']= 20
+            # currDataPacket.battery= int(packet_list[2], base=16)
+            # currDataPacket.signal= int(packet_list[5], base=16)
         # Exit function without altering anything
+
+        # print("\nFINAL INFO: ", addresses)
+        print(f"STATUS INFO ADDED for IMEI: {data[client]}!\n")
+        
         return(True)
     
     elif (protocol_name == 'hibernation'):
@@ -182,9 +202,11 @@ def read_incoming_packet(client, packet):
     # else:
         # r = generic_response(packet_list[1])
 
+    # print("\nFINAL INFO: ", data)   
+
     # Send response to client, if it exists
     if (r != ''):
-        print('[', addresses[client]['address'][0], ']', 'OUT Hex :', r, '(length in bytes =', len(bytes.fromhex(r)), ')')
+        # print('[', addresses[client]['address'][0], ']', 'OUT Hex :', r, '(length in bytes =', len(bytes.fromhex(r)), ')')
         send_response(client, r)
     
     # Return True to avoid failing in main while loop in handle_client()
@@ -206,9 +228,12 @@ def answer_login(client, query):
     addresses[client]['imei'] = ''.join(query[2:10])[1:]
     addresses[client]['software_version'] = int(query[10], base=16)
 
+    data[client]['imei']= addresses[client]['imei']
+    print(f"LOGIN INFO ADDED for IMEI: {data[client]}!\n")
     # DEBUG: Print IMEI and software version
-    print("Detected IMEI :", addresses[client]['imei'], "and Sw v. :", addresses[client]['software_version'])
-
+    # print("Detected IMEI :", addresses[client]['imei'], "and Sw v. :", addresses[client]['software_version'])
+    # global currDataPacket
+    # currDataPacket.imei= addresses[client]['imei']
     # Prepare response: in absence of control values, 
     # always accept the client
     response = '01'
@@ -315,14 +340,25 @@ def answer_gps(client, query):
     positions[client]['gps']['accuracy'] = 0.0
     positions[client]['gps']['speed'] = gps_speed
     positions[client]['gps']['heading'] = gps_heading
-    print('[', addresses[client]['address'][0], ']', "POSITION/GPS : Valid =", position_is_valid, "; Nb Sat =", gps_nb_sat, "; Lat =", gps_latitude, "; Long =", gps_longitude, "; Speed =", gps_speed, "; Heading =", gps_heading)
-    kk= open("E:/Kawach/userSearch Webpage/loc.txt", 'w')
-    lat=  gps_latitude
-    lon=  gps_longitude
-    kk.write(f"{lat}, {lon}")
-    kk.close()
+
+    data[client]['lat']= gps_latitude
+    data[client]['lng']= gps_longitude
+    data[client]['speed']= gps_speed
+    data[client]['time']= positions[client]['gps']['datetime']
+
+    print(f"GPS INFO ADDED for IMEI: {data[client]}!\n")
+
+    # print('[', addresses[client]['address'][0], ']', "POSITION/GPS : Valid =", position_is_valid, "; Nb Sat =", gps_nb_sat, "; Lat =", gps_latitude, "; Long =", gps_longitude, "; Speed =", gps_speed, "; Heading =", gps_heading)
+    writeToDB(data, client)
+    # kk= open("D:/ManoJava/Kawach/loc.txt", 'a')
+    # kk.write(f"\n{data[client]}")
+    # kk.close()
+    # global currDataPacket
+    # currDataPacket.lat= lat
+    # currDataPacket.long= lon
+    # currDataPacket.speed= gps_speed
     
-    LOGGER('location', 'location_log.txt', addresses[client]['address'][0], addresses[client]['imei'], '', positions[client]['gps'])
+    # LOGGER('location', 'location_log.txt', addresses[client]['address'][0], addresses[client]['imei'], '', positions[client]['gps'])
 
     # Get current datetime for answering
     # TEST: Return datetime that was extracted from packet instead of current server datetime
@@ -381,7 +417,7 @@ def answer_wifi_lbs(client, query):
             positions[client]['wifi'].append(current_wifi)
             
             # Print Wi-Fi hotspots into the logs
-            print('[', addresses[client]['address'][0], ']', "POSITION/WIFI : BSSID =", current_wifi['macAddress'], "; RSSI =", current_wifi['signalStrength'])
+            # print('[', addresses[client]['address'][0], ']', "POSITION/WIFI : BSSID =", current_wifi['macAddress'], "; RSSI =", current_wifi['signalStrength'])
 
     # GSM Cell towers
     n_gsm_cells = int(query[(8 + (7 * n_wifi))])
@@ -400,15 +436,15 @@ def answer_wifi_lbs(client, query):
             positions[client]['gsm-cells'].append(current_gsm_cell)
             
             # Print LBS data into logs as well
-            print('[', addresses[client]['address'][0], ']', "POSITION/LBS : LAC =", current_gsm_cell['locationAreaCode'], "; CellID =", current_gsm_cell['cellId'], "; MCISS =", current_gsm_cell['signalStrength'])
+            # print('[', addresses[client]['address'][0], ']', "POSITION/LBS : LAC =", current_gsm_cell['locationAreaCode'], "; CellID =", current_gsm_cell['cellId'], "; MCISS =", current_gsm_cell['signalStrength'])
 
     # Build first stage of response with dt and send it to devices
     r_1 = make_content_response(hex_dict['start'] + hex_dict['start'], protocol, dt.strftime('%y%m%d%H%M%S'), hex_dict['stop_1'] + hex_dict['stop_2'], ignoreDatetimeLength=False, ignoreSeparatorLength=False, forceLengthToValue=0)
 
     # Build second stage of response, which requires decoding the positioning data
-    print("Decoding location-based data using Google Maps Geolocation API...")
+    # print("Decoding location-based data using Google Maps Geolocation API...")
     decoded_position = GoogleMaps_geolocation_service(gmaps, positions[client])
-    
+    # print("==> DECODED POSITION", decoded_position)
     # Handle errors in decoding location
     if (list(decoded_position.keys())[0] == 'error'):
         # Google API returned an error
@@ -437,9 +473,21 @@ def answer_wifi_lbs(client, query):
         positions[client]['gps']['latitude'] = '{0:{1}}'.format(decoded_position['location']['lat'], '+' if decoded_position['location']['lat'] else '')
         positions[client]['gps']['longitude'] = '{0:{1}}'.format(decoded_position['location']['lng'], '+' if decoded_position['location']['lng'] else '')
         positions[client]['gps']['accuracy'] = decoded_position['accuracy']
-        positions[client]['gps']['speed'] = ''
-        positions[client]['gps']['heading'] = ''
-    LOGGER('location', 'location_log.txt', addresses[client]['address'][0], addresses[client]['imei'], '', positions[client]['gps'])
+        positions[client]['gps']['speed'] = '0'
+        positions[client]['gps']['heading'] = '0'
+        
+        data[client]['lat']= positions[client]['gps']['latitude']
+        data[client]['lng']= positions[client]['gps']['longitude']
+        data[client]['speed']= 0
+        data[client]['time']= positions[client]['gps']['datetime']
+    
+        # kk= open("D:/ManoJava/Kawach/loc.txt", 'a')
+        # kk.write(f"{data[client]}")
+        # kk.close()
+
+        writeToDB(data, client)
+
+    # LOGGER('location', 'location_log.txt', addresses[client]['address'][0], addresses[client]['imei'], '', positions[client]['gps'])
 
     # And return the second stage of response, which will be sent in the handle_package() function
     # The latitudes and longitudes are truncated to the 6th digit after decimal separator but must preserve the sign
@@ -454,7 +502,7 @@ def answer_wifi_lbs(client, query):
         return(r_1)
 
     elif (protocol == '69'):
-        print('[', addresses[client]['address'][0], ']', 'OUT Hex :', r_1, '(length in bytes =', len(bytes.fromhex(r_1)), ')')
+        # print('[', addresses[client]['address'][0], ']', 'OUT Hex :', r_1, '(length in bytes =', len(bytes.fromhex(r_1)), ')')
         send_response(client, r_1)
         return(r_2)
 
@@ -527,7 +575,7 @@ def send_response(client, response):
     """
     Function to send a response packet to the client.
     """
-    LOGGER('info', 'server_log.txt', addresses[client]['address'][0], addresses[client]['imei'], 'OUT', response)
+    # LOGGER('info', 'server_log.txt', addresses[client]['address'][0], data[client]['imei'], 'OUT', response)
     client.send(bytes.fromhex(response))
 
 
@@ -567,9 +615,9 @@ def GoogleMaps_geolocation_service(gmapsClient, positionDict):
 
     A nice source for such data is available at https://opencellid.org/
     """
-    print('Google Maps Geolocation API queried with:', positionDict)
+    # print('Google Maps Geolocation API queried with:', positionDict)
     geoloc = gmapsClient.geolocate(home_mobile_country_code=positionDict['gsm-carrier']['MCC'], 
-        home_mobile_network_code=positionDict['gsm-carrier']['MCC'], 
+        home_mobile_network_code=positionDict['gsm-carrier']['MNC'], 
         radio_type='gsm', 
         carrier='Free', 
         consider_ip='true', 
@@ -714,12 +762,14 @@ protocol_dict = {
     }
 }
 
-GMAPS_API_KEY = "AIzaSyAw-J-GIXFAeH8klm6oA_b6hCXSf7GkSV4"
+
+# Import dotenv with API keys and initialize API connections
+# GMAPS_API_KEY = os.getenv('GMAPS_API_KEY')
+GMAPS_API_KEY = "AIzaSyAwLB3TGsHTItz3iZQAfg1OhsM4L2dKzrk"
 gmaps = googlemaps.Client(key=GMAPS_API_KEY)
 
 # Details about host server
-# HOST = '10.5.48.29'
-HOST = ''
+HOST = '10.5.49.65'
 PORT = 8085
 BUFSIZ = 4096
 ADDR = (HOST, PORT)
@@ -731,6 +781,7 @@ SERVER.bind(ADDR)
 # Store client data into dictionaries
 addresses = {}
 positions = {}
+data= {}
 
 if __name__ == '__main__':
     SERVER.listen(5)

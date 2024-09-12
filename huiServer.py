@@ -81,7 +81,7 @@ def handle_client(client):
     # Keep receiving and analyzing packets until end of time
     # or until device sends disconnection signal
     keepAlive = True
-    currDataPacket= {}
+    # currDataPacket= {}
     while (True):
 
         # Handle socket errors with a try/except approach
@@ -103,8 +103,10 @@ def handle_client(client):
             # Close socket if recv() returns 0 bytes, i.e. connection has been closed
             else:
                 print('[', addresses[client]['address'][0], ']', 'DISCONNECTED: socket was closed for an unknown reason.')
+                print("==>ADDRESSES:", addresses)
+                print("==>POSITIONS:", positions)
                 client.close()
-                print("CURRDATAPACKET: ", currDataPacket)
+                # print("CURRDATAPACKET: ", currDataPacket)
                 break                
 
         # Something went sideways... close the socket so that it does not hang
@@ -112,7 +114,7 @@ def handle_client(client):
             print('[', addresses[client]['address'][0], ']', 'ERROR: socket was closed due to the following exception:')
             print(e)
             client.close()
-            print("CURRDATAPACKET: ", currDataPacket)
+            # print("CURRDATAPACKET: ", currDataPacket)
             break
     print("This thread is now closed.")
 
@@ -124,7 +126,7 @@ def read_incoming_packet(client, packet):
     packet that should be sent back.
     Actual sending of the response packet will be done by an external function.
     """ 
-    global currDataPacket
+    # global currDataPacket
 
     # Convert hex string into list for convenience
     # Strip packet of bits 1 and 2 (start 0x78 0x78) and n-1 and n (end 0x0d 0x0a)
@@ -150,13 +152,13 @@ def read_incoming_packet(client, packet):
         if (packet_list[0] == '06'): 
             print('[', addresses[client]['address'][0], ']', 'STATUS : Battery =', int(packet_list[2], base=16), '; Sw v. =', int(packet_list[3], base=16), '; Status upload interval =', int(packet_list[4], base=16))
             
-            currDataPacket.battery= int(packet_list[2], base=16)
-            currDataPacket.signal= 20
+            # currDataPacket.battery= int(packet_list[2], base=16)
+            # currDataPacket.signal= 20
 
         elif (packet_list[0] == '07'): 
             print('[', addresses[client]['address'][0], ']', 'STATUS : Battery =', int(packet_list[2], base=16), '; Sw v. =', int(packet_list[3], base=16), '; Status upload interval =', int(packet_list[4], base=16), '; Signal strength =', int(packet_list[5], base=16))
-            currDataPacket.battery= int(packet_list[2], base=16)
-            currDataPacket.signal= int(packet_list[5], base=16)
+            # currDataPacket.battery= int(packet_list[2], base=16)
+            # currDataPacket.signal= int(packet_list[5], base=16)
         # Exit function without altering anything
         return(True)
     
@@ -208,8 +210,8 @@ def answer_login(client, query):
 
     # DEBUG: Print IMEI and software version
     print("Detected IMEI :", addresses[client]['imei'], "and Sw v. :", addresses[client]['software_version'])
-    global currDataPacket
-    currDataPacket.imei= addresses[client]['imei']
+    # global currDataPacket
+    # currDataPacket.imei= addresses[client]['imei']
     # Prepare response: in absence of control values, 
     # always accept the client
     response = '01'
@@ -323,10 +325,10 @@ def answer_gps(client, query):
     lon=  gps_longitude
     kk.write(f"{lat}, {lon}")
     kk.close()
-    global currDataPacket
-    currDataPacket.lat= lat
-    currDataPacket.long= lon
-    currDataPacket.speed= gps_speed
+    # global currDataPacket
+    # currDataPacket.lat= lat
+    # currDataPacket.long= lon
+    # currDataPacket.speed= gps_speed
     
     LOGGER('location', 'location_log.txt', addresses[client]['address'][0], addresses[client]['imei'], '', positions[client]['gps'])
 
@@ -414,7 +416,7 @@ def answer_wifi_lbs(client, query):
     # Build second stage of response, which requires decoding the positioning data
     print("Decoding location-based data using Google Maps Geolocation API...")
     decoded_position = GoogleMaps_geolocation_service(gmaps, positions[client])
-    
+    print("==> DECODED POSITION", decoded_position)
     # Handle errors in decoding location
     if (list(decoded_position.keys())[0] == 'error'):
         # Google API returned an error
@@ -575,7 +577,7 @@ def GoogleMaps_geolocation_service(gmapsClient, positionDict):
     """
     print('Google Maps Geolocation API queried with:', positionDict)
     geoloc = gmapsClient.geolocate(home_mobile_country_code=positionDict['gsm-carrier']['MCC'], 
-        home_mobile_network_code=positionDict['gsm-carrier']['MCC'], 
+        home_mobile_network_code=positionDict['gsm-carrier']['MNC'], 
         radio_type='gsm', 
         carrier='Free', 
         consider_ip='true', 
@@ -723,12 +725,11 @@ protocol_dict = {
 
 # Import dotenv with API keys and initialize API connections
 # GMAPS_API_KEY = os.getenv('GMAPS_API_KEY')
-GMAPS_API_KEY = "AIzaSyAw-J-GIXFAeH8klm6oA_b6hCXSf7GkSV4"
+GMAPS_API_KEY = "AIzaSyAwLB3TGsHTItz3iZQAfg1OhsM4L2dKzrk"
 gmaps = googlemaps.Client(key=GMAPS_API_KEY)
 
 # Details about host server
-# HOST = '10.5.48.29'
-HOST = ''
+HOST = '10.5.49.65'
 PORT = 8085
 BUFSIZ = 4096
 ADDR = (HOST, PORT)
@@ -740,7 +741,6 @@ SERVER.bind(ADDR)
 # Store client data into dictionaries
 addresses = {}
 positions = {}
-
 if __name__ == '__main__':
     SERVER.listen(5)
     print("Waiting for connection...")
