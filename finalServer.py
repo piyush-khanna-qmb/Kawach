@@ -28,7 +28,7 @@ import time
 def writeToDB(data, client):
     print("\nDATA PUBLISHED ==>", data[client])
     kk= open("D:/ManoJava/Kawach/loc.txt", 'a')
-    kk.write("\n", data[client])
+    kk.write(f"\n {data[client]}")
     kk.close()
 
 
@@ -46,7 +46,12 @@ def accept_incoming_connections():
         addresses[client] = {}
         positions[client] = {}
         data[client] = {}
-        
+
+        #Khaali values se intialise
+        data[client]['speed']= 0
+        data[client]['battery']= 0
+        data[client]['signal']= 0
+
         # Add current client address into adresses
         addresses[client]['address'] = client_address
         Thread(target=handle_client, args=(client,)).start()
@@ -170,7 +175,7 @@ def read_incoming_packet(client, packet):
         elif (packet_list[0] == '07'): 
             # print('[', addresses[client]['address'][0], ']', 'STATUS : Battery =', int(packet_list[2], base=16), '; Sw v. =', int(packet_list[3], base=16), '; Status upload interval =', int(packet_list[4], base=16), '; Signal strength =', int(packet_list[5], base=16))
             data[client]['battery']= int(packet_list[2], base=16)
-            data[client]['signal']= 20
+            data[client]['signal']= int(packet_list[5], base=16)
             # currDataPacket.battery= int(packet_list[2], base=16)
             # currDataPacket.signal= int(packet_list[5], base=16)
         # Exit function without altering anything
@@ -769,7 +774,8 @@ GMAPS_API_KEY = "AIzaSyAwLB3TGsHTItz3iZQAfg1OhsM4L2dKzrk"
 gmaps = googlemaps.Client(key=GMAPS_API_KEY)
 
 # Details about host server
-HOST = '10.5.49.65'
+# HOST = '10.5.49.65'
+HOST = '192.168.1.40'
 PORT = 8085
 BUFSIZ = 4096
 ADDR = (HOST, PORT)
