@@ -1,18 +1,11 @@
 #!/bin/python
 
 """
-TCP Server for multithreaded (asynchronous) application.
-
-This server implements the protocol documented by the chinese
-company TOPIN to handle communication with their GPS trackers,
-sending and receiving TCP packets over 2G network.
-
-This program will create a TCP socket and each client will have
-its dedicated thread created, so that multipe clients can connect 
-simultaneously should this be necessary someday.
-
-This server is based on the work from:
-https://medium.com/swlh/lets-write-a-chat-app-in-python-f6783a9ac170
+V. Second Last
+Completely functional Server with data object creation after reciving data from all devices in Multithreaded mode.
+Author: Victor Baron
+Timestamp: 8-Oct-2024  :: 12:30PM
+Era: The 2012 Corporate
 """
 
 from dotenv import load_dotenv
